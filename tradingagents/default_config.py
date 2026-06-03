@@ -18,6 +18,11 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_CHECKPOINT_ENABLED":   "checkpoint_enabled",
     "TRADINGAGENTS_BENCHMARK_TICKER":     "benchmark_ticker",
     "TRADINGAGENTS_TEMPERATURE":          "temperature",
+    # Data vendor overrides
+    "TRADINGAGENTS_DATA_VENDORS_CORE_STOCK_APIS": "_core_stock_apis",
+    "TRADINGAGENTS_DATA_VENDORS_TECHNICAL_INDICATORS": "_technical_indicators",
+    "TRADINGAGENTS_DATA_VENDORS_FUNDAMENTAL_DATA": "_fundamental_data",
+    "TRADINGAGENTS_DATA_VENDORS_NEWS_DATA": "_news_data",
 }
 
 
@@ -34,11 +39,37 @@ def _coerce(value: str, reference):
 
 def _apply_env_overrides(config: dict) -> dict:
     """Apply TRADINGAGENTS_* env vars to the config dict in-place."""
+    # Collect data vendor overrides
+    vendor_overrides = {}
+    for env_var, key in list(_ENV_OVERRIDES.items()):
+        if key.startswith("_"):
+            raw = os.environ.get(env_var)
+            if raw is None or raw == "":
+                continue
+            vendor_overrides[key] = raw
+            # Remove from _ENV_OVERRIDES processing
+            del _ENV_OVERRIDES[env_var]
+    
+    # Apply standard overrides
     for env_var, key in _ENV_OVERRIDES.items():
         raw = os.environ.get(env_var)
         if raw is None or raw == "":
             continue
         config[key] = _coerce(raw, config.get(key))
+    
+    # Apply data vendor overrides
+    if vendor_overrides:
+        vendors = config.get("data_vendors", {})
+        if "_core_stock_apis" in vendor_overrides:
+            vendors["core_stock_apis"] = vendor_overrides["_core_stock_apis"]
+        if "_technical_indicators" in vendor_overrides:
+            vendors["technical_indicators"] = vendor_overrides["_technical_indicators"]
+        if "_fundamental_data" in vendor_overrides:
+            vendors["fundamental_data"] = vendor_overrides["_fundamental_data"]
+        if "_news_data" in vendor_overrides:
+            vendors["news_data"] = vendor_overrides["_news_data"]
+        config["data_vendors"] = vendors
+    
     return config
 
 
@@ -99,10 +130,10 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "mysql",          # Options: mysql, akshare, alpha_vantage, yfinance
+        "technical_indicators": "mysql",     # Options: mysql, akshare (pandas-ta), alpha_vantage, yfinance
+        "fundamental_data": "mysql",         # Options: mysql, akshare, alpha_vantage, yfinance
+        "news_data": "mysql",                # Options: mysql, akshare, alpha_vantage, yfinance
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
